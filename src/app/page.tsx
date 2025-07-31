@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, ChangeEvent } from "react";
+import { useState, ChangeEvent } from "react";
 import { generateSkit } from "@/ai/flows/generate-skit-flow";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,9 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { GEMINI_VOICES } from "@/lib/constants";
-import { Loader2, Clapperboard, Download, AlertTriangle } from "lucide-react";
+import { Loader2, Clapperboard, Download, Plus, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
-type CharacterVoices = Record<string, string>;
+interface Character {
+    id: number;
+    name: string;
+    voice: string;
+}
+
+let nextId = 3;
 
 export default function Home() {
   const [script, setScript] = useState(
@@ -23,45 +30,39 @@ Anna: I wrote a short scene for my animation project. The voice acting was perfe
 Robot: I have generated 1,200 unique audio dramas in the last 24 hours. They are... compelling.
 P1: Okay, I'm sold. I'm trying this out right now.`
   );
-  const [characterVoices, setCharacterVoices] = useState<CharacterVoices>({});
+  const [characters, setCharacters] = useState<Character[]>([
+    { id: 1, name: "P1", voice: GEMINI_VOICES[0].id },
+    { id: 2, name: "Anna", voice: GEMINI_VOICES[1].id },
+    { id: 0, name: "Robot", voice: GEMINI_VOICES[2].id },
+  ]);
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const characters = useMemo(() => {
-    const chara_regex = /(^[a-zA-Z0-9\s_]+):/gm;
-    const matches = script.match(chara_regex);
-    if (!matches) return [];
-    const uniqueChars = [...new Set(matches.map(c => c.replace(":", "").trim()))];
-    return uniqueChars;
-  }, [script]);
-
-  useEffect(() => {
-    const newCharacterVoices = { ...characterVoices };
-    let hasChanged = false;
-    characters.forEach((char, index) => {
-      if (!newCharacterVoices[char]) {
-        newCharacterVoices[char] = GEMINI_VOICES[index % GEMINI_VOICES.length].id;
-        hasChanged = true;
-      }
-    });
-
-    const oldChars = Object.keys(newCharacterVoices);
-    oldChars.forEach(char => {
-      if (!characters.includes(char)) {
-        delete newCharacterVoices[char];
-        hasChanged = true;
-      }
-    });
-
-    if (hasChanged) {
-      setCharacterVoices(newCharacterVoices);
-    }
-  }, [characters, characterVoices]);
-
-  const handleVoiceChange = (character: string, voice: string) => {
-    setCharacterVoices(prev => ({ ...prev, [character]: voice }));
+  const handleAddCharacter = () => {
+    const newCharacterName = `Character ${characters.length + 1}`;
+    setCharacters([
+      ...characters,
+      {
+        id: nextId++,
+        name: newCharacterName,
+        voice: GEMINI_VOICES[characters.length % GEMINI_VOICES.length].id,
+      },
+    ]);
   };
+
+  const handleRemoveCharacter = (id: number) => {
+    setCharacters(characters.filter((char) => char.id !== id));
+  };
+
+  const handleCharacterChange = (id: number, field: 'name' | 'voice', value: string) => {
+    setCharacters(
+      characters.map((char) =>
+        char.id === id ? { ...char, [field]: value } : char
+      )
+    );
+  };
+
 
   const handleGenerateSkit = async () => {
     if (script.trim() === "") {
@@ -73,6 +74,14 @@ P1: Okay, I'm sold. I'm trying this out right now.`
         return;
     }
     
+    const characterVoices = characters.reduce((acc, char) => {
+      if (char.name) {
+        acc[char.name] = char.voice;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+
+
     setIsLoading(true);
     setAudioUrl(null);
     try {
@@ -126,7 +135,8 @@ P1: Okay, I'm sold. I'm trying this out right now.`
               </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="P1: Hello world!&#10;P2: Hi there, how are you?"
+                placeholder="P1: Hello world!
+P2: Hi there, how are you?"
                 value={script}
                 onChange={handleScriptChange}
                 className="min-h-[400px] md:min-h-[500px] text-base resize-none bg-background/50 focus:bg-background"
@@ -141,23 +151,43 @@ P1: Okay, I'm sold. I'm trying this out right now.`
           <Card className="sticky top-8 bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader>
               <CardTitle>Control Panel</CardTitle>
-              <CardDescription>Assign a unique voice to each character.</CardDescription>
+              <CardDescription>Manage characters and their voices.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-h-[350px] overflow-y-auto pr-3">
-              {characters.length > 0 ? (
-                characters.map(char => (
-                  <div key={char} className="space-y-2">
-                    <Label htmlFor={`voice-${char}`} className="text-base font-medium">{char}</Label>
+              {characters.map((char) => (
+                <div key={char.id} className="space-y-3 p-3 border rounded-md relative">
+                   <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1 right-1 h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRemoveCharacter(char.id)}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove {char.name}</span>
+                  </Button>
+                  <div className="space-y-1">
+                    <Label htmlFor={`name-${char.id}`}>Character Name</Label>
+                    <Input
+                      id={`name-${char.id}`}
+                      value={char.name}
+                      onChange={(e) => handleCharacterChange(char.id, 'name', e.target.value)}
+                      placeholder="e.g., Narrator"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`voice-${char.id}`}>Voice</Label>
                     <Select
-                      value={characterVoices[char]}
-                      onValueChange={(value) => handleVoiceChange(char, value)}
+                      value={char.voice}
+                      onValueChange={(value) => handleCharacterChange(char.id, 'voice', value)}
                       disabled={isLoading}
                     >
-                      <SelectTrigger id={`voice-${char}`}>
+                      <SelectTrigger id={`voice-${char.id}`}>
                         <SelectValue placeholder="Select a voice" />
                       </SelectTrigger>
                       <SelectContent>
-                        {GEMINI_VOICES.map(voice => (
+                        {GEMINI_VOICES.map((voice) => (
                           <SelectItem key={voice.id} value={voice.id}>
                             {voice.name}
                           </SelectItem>
@@ -165,15 +195,14 @@ P1: Okay, I'm sold. I'm trying this out right now.`
                       </SelectContent>
                     </Select>
                   </div>
-                ))
-              ) : (
-                <div className="text-sm text-muted-foreground text-center py-4 px-2 border border-dashed rounded-lg">
-                  <p>No characters detected.</p>
-                  <p>Start typing in the script editor to add characters.</p>
                 </div>
-              )}
+              ))}
+               <Button onClick={handleAddCharacter} variant="outline" className="w-full" disabled={isLoading}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Character
+              </Button>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex flex-col gap-4 pt-6">
               <Button onClick={handleGenerateSkit} disabled={isLoading || characters.length === 0} className="w-full text-lg py-6">
                 {isLoading ? (
                   <>
