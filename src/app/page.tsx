@@ -174,7 +174,7 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
         </h1>
       </header>
 
-      <div className="flex flex-col md:flex-row gap-8">
+      <div className="flex flex-col md:flex-row gap-8 md:items-start">
         {/* Left Column: Script Editor */}
         <div className="md:w-[65%] lg:w-[70%] space-y-8">
             <Card className="bg-card/80 backdrop-blur-sm border-border/50">
