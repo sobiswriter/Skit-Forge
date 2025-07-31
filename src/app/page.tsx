@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GEMINI_VOICES } from "@/lib/constants";
+import { GEMINI_VOICES, groupedVoices } from "@/lib/constants";
 import { Loader2, Clapperboard, Download, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -33,7 +33,7 @@ P1: Okay, I'm sold. I'm trying this out right now.`
   );
   const [characters, setCharacters] = useState<Character[]>([
     { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "Sounds excited and curious." },
-    { id: 2, name: "Anna", voice: GEMINI_VOICES[1].id, persona: "Friendly and enthusiastic." },
+    { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, persona: "Friendly and enthusiastic." },
     { id: 0, name: "Robot", voice: GEMINI_VOICES[2].id, persona: "Monotone, logical, and factual." },
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -200,10 +200,15 @@ P2: Hi there, how are you?"
                         <SelectValue placeholder="Select a voice" />
                       </SelectTrigger>
                       <SelectContent>
-                        {GEMINI_VOICES.map((voice) => (
-                          <SelectItem key={voice.id} value={voice.id}>
-                            {voice.name}
-                          </SelectItem>
+                        {Object.entries(groupedVoices).map(([gender, voices]) => (
+                          <SelectGroup key={gender}>
+                            <SelectLabel>{gender}</SelectLabel>
+                            {voices.map((voice) => (
+                              <SelectItem key={voice.id} value={voice.id}>
+                                {voice.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>
