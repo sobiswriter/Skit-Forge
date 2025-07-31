@@ -36,11 +36,16 @@ const generateSkitFlow = ai.defineFlow(
     outputSchema: GenerateSkitOutputSchema,
   },
   async input => {
-    const scriptLines = input.script.split('\n');
+    const scriptLines = input.script.split('\n').filter(line => line.trim() !== '');
     const audioBuffers: Buffer[] = [];
 
     for (const line of scriptLines) {
-      const [character, dialogue] = line.split(/:(.*)/s).map(s => s.trim());
+      const parts = line.split(/:(.*)/s);
+      if (parts.length < 2) continue;
+
+      const character = parts[0].trim();
+      const dialogue = parts[1].trim();
+      
       if (!character || !dialogue) {
         continue;
       }
@@ -55,7 +60,7 @@ const generateSkitFlow = ai.defineFlow(
 
       const prompt = persona 
         ? `(Speaking as ${character}, with the persona: ${persona}) ${dialogue}`
-        : `${character}: ${dialogue}`;
+        : dialogue;
 
       const {media} = await ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
@@ -80,6 +85,10 @@ const generateSkitFlow = ai.defineFlow(
         'base64'
       );
       audioBuffers.push(audioBuffer);
+    }
+
+    if (audioBuffers.length === 0) {
+        throw new Error("No audio could be generated from the script. Please check the script format.");
     }
 
     // Concatenate audio buffers
