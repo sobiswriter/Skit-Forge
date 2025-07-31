@@ -32,11 +32,11 @@ const scriptPrompt = ai.definePrompt({
     name: 'scriptPrompt',
     input: { schema: GenerateScriptInputSchema },
     output: { schema: GenerateScriptOutputSchema },
-    prompt: `You are an expert scriptwriter for short audio skits. Your task is to write a script based on the user's prompt.
+    prompt: `You are an expert scriptwriter for short audio skits. Your task is to write a script based on the user's prompt, focusing on natural-sounding dialogue.
 
 You MUST use the characters provided and adhere to their specified personas. The script should be formatted with each line as 'CharacterName: Dialogue'.
 
-IMPORTANT: To make the voice acting more dynamic, you MUST include emotional cues or stage directions in parentheses within the dialogue. For example: (laughing), (whispering), (angrily), (thoughtfully).
+IMPORTANT: Use emotional cues or stage directions (in parentheses) sparingly, and only when the tone is not obvious from the dialogue itself. Do NOT have the characters speak the directions out loud. The goal is a realistic, engaging conversation.
 
 User Prompt:
 "{{{prompt}}}"

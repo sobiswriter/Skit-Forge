@@ -1,6 +1,5 @@
 export const GEMINI_VOICES = [
     // Male
-    { id: 'zephyr', name: 'Zephyr - Bright, Male' },
     { id: 'puck', name: 'Puck - Upbeat, Male' },
     { id: 'charon', name: 'Charon - Informative, Male' },
     { id: 'fenrir', name: 'Fenrir - Excitable, Male' },
@@ -16,6 +15,7 @@ export const GEMINI_VOICES = [
     { id: 'zubenelgenubi', name: 'Zubenelgenubi - Casual, Male' },
     { id: 'sadaltager', name: 'Sadaltager - Knowledgeable, Male' },
     // Female
+    { id: 'zephyr', name: 'Zephyr - Bright, Female' },
     { id: 'kore', name: 'Kore - Firm, Female' },
     { id: 'leda', name: 'Leda - Youthful, Female' },
     { id: 'aoede', name: 'Aoede - Breezy, Female' },
@@ -35,7 +35,6 @@ export const GEMINI_VOICES = [
 
 export const groupedVoices = {
     "Male": [
-        { id: 'zephyr', name: 'Zephyr - Bright' },
         { id: 'puck', name: 'Puck - Upbeat' },
         { id: 'charon', name: 'Charon - Informative' },
         { id: 'fenrir', name: 'Fenrir - Excitable' },
@@ -52,6 +51,7 @@ export const groupedVoices = {
         { id: 'sadaltager', name: 'Sadaltager - Knowledgeable' },
     ],
     "Female": [
+        { id: 'zephyr', name: 'Zephyr - Bright' },
         { id: 'kore', name: 'Kore - Firm' },
         { id: 'leda', name: 'Leda - Youthful' },
         { id: 'aoede', name: 'Aoede - Breezy' },
