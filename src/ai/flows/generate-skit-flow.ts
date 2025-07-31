@@ -17,6 +17,7 @@ const GenerateSkitInputSchema = z.object({
     voice: z.string(),
     persona: z.string(),
   })).describe('A map of character names to their voice and persona.'),
+  model: z.string().describe('The name of the model to use for generation.'),
 });
 export type GenerateSkitInput = z.infer<typeof GenerateSkitInputSchema>;
 
@@ -63,7 +64,7 @@ const generateSkitFlow = ai.defineFlow(
 
       try {
         const {media} = await ai.generate({
-          model: 'googleai/gemini-2.5-flash-preview-tts',
+          model: `googleai/${input.model}`,
           config: {
             responseModalities: ['AUDIO'],
             speechConfig: {

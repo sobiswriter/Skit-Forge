@@ -20,6 +20,12 @@ interface Character {
     persona: string;
 }
 
+const TTS_MODELS = [
+    { id: "gemini-2.5-flash-preview-tts", name: "Gemini 2.5 Flash TTS" },
+    { id: "gemini-2.5-flash-preview-native-audio-dialog", name: "Gemini 2.5 Flash Native Audio" },
+    { id: "gemini-2.5-flash-exp-native-audio-thinking-dialog", name: "Gemini 2.5 Flash Exp Native Audio" },
+];
+
 let nextId = 3;
 
 export default function Home() {
@@ -41,6 +47,7 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState(TTS_MODELS[0].id);
   const { toast } = useToast();
 
   const handleAddCharacter = () => {
@@ -127,7 +134,7 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
     setIsLoading(true);
     setAudioUrl(null);
     try {
-      const result = await generateSkit({ script, characterVoices });
+      const result = await generateSkit({ script, characterVoices, model: selectedModel });
       if (result.audioDataUri) {
         setAudioUrl(result.audioDataUri);
         toast({
@@ -230,6 +237,25 @@ P2: Hi there, how are you?"
               <CardDescription>Manage characters, voices, and personas.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-h-[450px] overflow-y-auto pr-3">
+              <div className="space-y-1">
+                <Label htmlFor="tts-model">Audio Model</Label>
+                <Select
+                  value={selectedModel}
+                  onValueChange={setSelectedModel}
+                  disabled={isLoading || isGeneratingScript}
+                >
+                  <SelectTrigger id="tts-model">
+                    <SelectValue placeholder="Select a model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TTS_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {characters.map((char) => (
                 <div key={char.id} className="space-y-3 p-3 border rounded-md relative">
                    <Button
