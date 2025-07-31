@@ -22,8 +22,6 @@ interface Character {
 
 const TTS_MODELS = [
     { id: "gemini-2.5-flash-preview-tts", name: "Gemini 2.5 Flash TTS" },
-    { id: "gemini-2.5-flash-preview-native-audio-dialog", name: "Gemini 2.5 Flash Native Audio" },
-    { id: "gemini-2.5-flash-exp-native-audio-thinking-dialog", name: "Gemini 2.5 Flash Exp Native Audio" },
 ];
 
 let nextId = 3;
@@ -149,7 +147,7 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
       toast({
         variant: "destructive",
         title: "Generation Failed",
-        description: error.message || "Something went wrong. Please check the script format (e.g., 'Character:') and try again.",
+        description: error.message || "Something went wrong. Please check the script format and that all characters are defined in the control panel.",
       });
     } finally {
       setIsLoading(false);

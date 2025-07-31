@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A flow to generate an audio skit from a script with assigned voices.
+ * @fileOverview A flow to generate an audio skit from a script with assigned voices using multi-speaker TTS.
  *
  * - generateSkit - A function that handles the skit generation process.
  * - GenerateSkitInput - The input type for the generateSkit function.
@@ -10,6 +10,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import wav from 'wav';
+import {googleAI} from '@genkit-ai/googleai';
 
 const GenerateSkitInputSchema = z.object({
   script: z.string().describe('The script for the skit.'),
@@ -37,93 +38,62 @@ const generateSkitFlow = ai.defineFlow(
     outputSchema: GenerateSkitOutputSchema,
   },
   async input => {
-    const scriptLines = input.script.split('\n').filter(line => line.trim() !== '');
+    // Validate that the script is not empty
+    if (!input.script.trim()) {
+        throw new Error("The script is empty. Please provide a script to generate audio.");
+    }
+    
+    const speakers = Object.keys(input.characterVoices);
+    if (speakers.length === 0) {
+        throw new Error("No characters defined. Please add characters in the Control Panel.");
+    }
 
-    const audioPromises = scriptLines.map(async (line, index) => {
-      const parts = line.split(/:(.*)/s);
-      if (parts.length < 2) return { buffer: null, index };
+    const speakerVoiceConfigs = speakers.map(speaker => {
+        const character = input.characterVoices[speaker];
+        if (!character) {
+            // This case should ideally not happen if speakers are derived from characterVoices keys
+            throw new Error(`Configuration for speaker "${speaker}" not found.`);
+        }
+        return {
+            speaker: speaker,
+            voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: character.voice }
+            }
+        };
+    });
 
-      const character = parts[0].trim();
-      const dialogue = parts[1].trim();
-      
-      if (!character || !dialogue) {
-        return { buffer: null, index };
-      }
-
-      const characterInfo = input.characterVoices[character];
-      if (!characterInfo) {
-        throw new Error(`Character "${character}" is used in the script but not defined in the Control Panel. Please add this character or correct the name.`);
-      }
-      
-      const { voice, persona } = characterInfo;
-
-      const prompt = persona 
-        ? `(Speaking as ${character}, with the persona: ${persona}) ${dialogue}`
-        : dialogue;
-
-      try {
-        const {media} = await ai.generate({
-          model: `googleai/${input.model}`,
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {voiceName: voice},
-              },
+    try {
+        const { media } = await ai.generate({
+            model: googleAI.model(input.model as any),
+            config: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                    multiSpeakerVoiceConfig: {
+                        speakerVoiceConfigs: speakerVoiceConfigs,
+                    },
+                },
             },
-          },
-          prompt: prompt,
+            prompt: input.script,
         });
 
         if (!media) {
-          throw new Error(`Model returned no media for line: "${line}"`);
+            throw new Error("The model did not return any audio data. Please check your script and character configuration.");
         }
 
         const audioBuffer = Buffer.from(
-          media.url.substring(media.url.indexOf(',') + 1),
-          'base64'
+            media.url.substring(media.url.indexOf(',') + 1),
+            'base64'
         );
-        return { buffer: audioBuffer, index };
-      } catch (error: any) {
-         console.error(`Error generating audio for line "${line}":`, error);
-         // Re-throw the error with more context to be caught by the front-end
-         throw new Error(`Failed to generate audio for line: "${line}". Reason: ${error.message}`);
-      }
-    });
+        
+        const wavDataUri = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
 
-    const results = await Promise.all(
-        audioPromises.map(p => p.catch(e => e))
-    );
+        return { audioDataUri: wavDataUri };
 
-    const successfulResults = results.filter(r => !(r instanceof Error) && r.buffer);
-    const errors = results.filter(r => r instanceof Error);
-
-    if (errors.length > 0) {
-        // If there are any errors, we should report the first one.
-        throw new Error(errors[0].message);
+    } catch (error: any) {
+        console.error(`Error during multi-speaker TTS generation:`, error);
+        // Provide a more user-friendly error message
+        throw new Error(`Failed to generate skit. The service reported: ${error.message}. Please check that all characters in the script are defined in the control panel and your script format is correct.`);
     }
-    
-    if (successfulResults.length === 0) {
-        throw new Error("No audio could be generated from the script. Please check the script format and that all characters are defined.");
-    }
-
-    const orderedBuffers = successfulResults
-        .sort((a, b) => a.index - b.index)
-        .map(r => r.buffer)
-        .filter((b): b is Buffer => b !== null);
-
-    // This check is now somewhat redundant but good for safety.
-    if (orderedBuffers.length === 0) {
-        throw new Error("No audio could be generated from the script. Please check the script format.");
-    }
-
-    // Concatenate audio buffers
-    const concatenatedAudio = Buffer.concat(orderedBuffers);
-
-    // Convert to WAV format
-    const wavDataUri = 'data:audio/wav;base64,' + (await toWav(concatenatedAudio));
-
-    return {audioDataUri: wavDataUri};
   }
 );
 
