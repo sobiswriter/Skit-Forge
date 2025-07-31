@@ -2,6 +2,7 @@
 
 import { useState, ChangeEvent } from "react";
 import { generateSkit } from "@/ai/flows/generate-skit-flow";
+import { generateScript } from "@/ai/flows/generate-script-flow";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { GEMINI_VOICES, groupedVoices } from "@/lib/constants";
-import { Loader2, Clapperboard, Download, Plus, Trash2 } from "lucide-react";
+import { Loader2, Clapperboard, Download, Plus, Trash2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface Character {
@@ -22,14 +23,16 @@ interface Character {
 let nextId = 3;
 
 export default function Home() {
+  const [scriptPrompt, setScriptPrompt] = useState("A short, funny debate between a robot and a human about whether pineapple belongs on pizza.");
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [script, setScript] = useState(
 `P1: Hey, did you see that new AI tool, SkitForge?
 Anna: Oh, the one that generates dialogue? I tried it yesterday. It's surprisingly good!
-Robot: Affirmative. My analysis indicates a 98.7% increase in creative workflow efficiency.
+Robot: (calmly) Affirmative. My analysis indicates a 98.7% increase in creative workflow efficiency.
 P1: Wow, even the robot is impressed. What did you make, Anna?
-Anna: I wrote a short scene for my animation project. The voice acting was perfect for the initial storyboard. Saved me a ton of time.
-Robot: I have generated 1,200 unique audio dramas in the last 24 hours. They are... compelling.
-P1: Okay, I'm sold. I'm trying this out right now.`
+Anna: (excitedly) I wrote a short scene for my animation project. The voice acting was perfect for the initial storyboard. Saved me a ton of time.
+Robot: (matter-of-factly) I have generated 1,200 unique audio dramas in the last 24 hours. They are... compelling.
+P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
   );
   const [characters, setCharacters] = useState<Character[]>([
     { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "Sounds excited and curious." },
@@ -65,6 +68,43 @@ P1: Okay, I'm sold. I'm trying this out right now.`
     );
   };
 
+  const handleAiGenerateScript = async () => {
+    if (!scriptPrompt.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Empty Prompt',
+        description: 'Please enter a prompt for the AI script writer.',
+      });
+      return;
+    }
+    setIsGeneratingScript(true);
+    try {
+      const characterData = characters.map(({ name, persona }) => ({ name, persona }));
+      const result = await generateScript({
+        prompt: scriptPrompt,
+        characters: characterData,
+      });
+      if (result.script) {
+        setScript(result.script);
+        setAudioUrl(null);
+        toast({
+          title: 'Script Generated!',
+          description: 'The AI has written your script. You can edit it below.',
+        });
+      } else {
+        throw new Error('Script generation failed.');
+      }
+    } catch (error) {
+      console.error('Error generating script:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Script Generation Failed',
+        description: 'The AI failed to generate a script. Please try again.',
+      });
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
 
   const handleGenerateSkit = async () => {
     if (script.trim() === "") {
@@ -127,12 +167,46 @@ P1: Okay, I'm sold. I'm trying this out right now.`
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Left Column: Script Editor */}
-        <div className="md:w-[65%] lg:w-[70%]">
+        <div className="md:w-[65%] lg:w-[70%] space-y-8">
+            <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Sparkles className="text-accent"/>
+                        AI Script Writer
+                    </CardTitle>
+                    <CardDescription>
+                        Give the AI a prompt and it will write a script for you using your characters.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Textarea
+                        placeholder="e.g., A debate between a cat and a dog about who is the better pet."
+                        value={scriptPrompt}
+                        onChange={(e) => setScriptPrompt(e.target.value)}
+                        className="text-base resize-none bg-background/50 focus:bg-background"
+                        disabled={isGeneratingScript || isLoading}
+                        rows={3}
+                    />
+                </CardContent>
+                <CardFooter>
+                     <Button onClick={handleAiGenerateScript} disabled={isGeneratingScript || isLoading || characters.length === 0} className="w-full sm:w-auto">
+                        {isGeneratingScript ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Writing...
+                        </>
+                        ) : (
+                        "Generate Script"
+                        )}
+                    </Button>
+                </CardFooter>
+            </Card>
+
           <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50">
              <CardHeader>
                 <CardTitle>Script Editor</CardTitle>
                 <CardDescription>
-                  Write your script below. Use the format `Character: Dialogue` for each line.
+                  Write your script below or generate one with AI. Use the format `Character: Dialogue`.
                 </CardDescription>
               </CardHeader>
             <CardContent>
@@ -141,8 +215,8 @@ P1: Okay, I'm sold. I'm trying this out right now.`
 P2: Hi there, how are you?"
                 value={script}
                 onChange={handleScriptChange}
-                className="min-h-[400px] md:min-h-[600px] text-base resize-none bg-background/50 focus:bg-background"
-                disabled={isLoading}
+                className="min-h-[400px] md:min-h-[500px] text-base resize-none bg-background/50 focus:bg-background"
+                disabled={isLoading || isGeneratingScript}
               />
             </CardContent>
           </Card>
@@ -163,7 +237,7 @@ P2: Hi there, how are you?"
                     size="icon"
                     className="absolute top-1 right-1 h-7 w-7 text-muted-foreground hover:text-destructive"
                     onClick={() => handleRemoveCharacter(char.id)}
-                    disabled={isLoading}
+                    disabled={isLoading || isGeneratingScript}
                   >
                     <Trash2 className="h-4 w-4" />
                     <span className="sr-only">Remove {char.name}</span>
@@ -175,7 +249,7 @@ P2: Hi there, how are you?"
                       value={char.name}
                       onChange={(e) => handleCharacterChange(char.id, 'name', e.target.value)}
                       placeholder="e.g., Narrator"
-                      disabled={isLoading}
+                      disabled={isLoading || isGeneratingScript}
                     />
                   </div>
                    <div className="space-y-1">
@@ -186,7 +260,7 @@ P2: Hi there, how are you?"
                       onChange={(e) => handleCharacterChange(char.id, 'persona', e.target.value)}
                       placeholder="e.g., Witty and sarcastic"
                       className="text-sm min-h-[60px]"
-                      disabled={isLoading}
+                      disabled={isLoading || isGeneratingScript}
                     />
                   </div>
                   <div className="space-y-1">
@@ -194,7 +268,7 @@ P2: Hi there, how are you?"
                     <Select
                       value={char.voice}
                       onValueChange={(value) => handleCharacterChange(char.id, 'voice', value)}
-                      disabled={isLoading}
+                      disabled={isLoading || isGeneratingScript}
                     >
                       <SelectTrigger id={`voice-${char.id}`}>
                         <SelectValue placeholder="Select a voice" />
@@ -215,20 +289,20 @@ P2: Hi there, how are you?"
                   </div>
                 </div>
               ))}
-               <Button onClick={handleAddCharacter} variant="outline" className="w-full" disabled={isLoading}>
+               <Button onClick={handleAddCharacter} variant="outline" className="w-full" disabled={isLoading || isGeneratingScript}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Character
               </Button>
             </CardContent>
             <CardFooter className="flex flex-col gap-4 pt-6">
-              <Button onClick={handleGenerateSkit} disabled={isLoading || characters.length === 0} className="w-full text-lg py-6">
+              <Button onClick={handleGenerateSkit} disabled={isLoading || isGeneratingScript || characters.length === 0} className="w-full text-lg py-6">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Generating Skit...
                   </>
                 ) : (
-                  "Generate Skit"
+                  "Generate Skit Audio"
                 )}
               </Button>
             </CardFooter>
