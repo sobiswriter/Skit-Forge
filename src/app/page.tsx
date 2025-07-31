@@ -36,12 +36,14 @@ export default function Home() {
   const [scriptPrompt, setScriptPrompt] = useState("A short, funny debate about whether pineapple belongs on pizza.");
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [script, setScript] = useState(
-`P1: Hey, did you see that new AI tool, SkitForge?
-Anna: Oh, the one that generates dialogue? I tried it yesterday. It's surprisingly good!`
+`P1: (Sighs) Another day, another mountain of code. I wonder if this is all there is to it.
+Anna: (Cheerfully) Oh, come on! We're building worlds with words here. What's not to love? I just tried out this new SkitForge AI. It's supposed to be amazing for generating dialogue.
+P1: (Skeptical) An AI writing scripts? Sounds like a shortcut to soulless content.
+Anna: I thought so too, but you should hear it! The voices sound so natural. (Excitedly) We should give it a try for the podcast!`
   );
   const [characters, setCharacters] = useState<Character[]>([
-    { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "Sounds excited and curious." },
-    { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, persona: "Friendly and enthusiastic." },
+    { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "A bit jaded and skeptical, but secretly curious." },
+    { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, persona: "Friendly, enthusiastic, and optimistic about technology." },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);

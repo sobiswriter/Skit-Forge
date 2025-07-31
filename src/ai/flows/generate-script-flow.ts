@@ -38,7 +38,7 @@ const scriptPrompt = ai.definePrompt({
 
 You MUST use the characters provided and adhere to their specified personas. The script should be formatted with each line as 'CharacterName: Dialogue'.
 
-IMPORTANT: Use emotional cues or stage directions (in parentheses) sparingly, and only when the tone is not obvious from the dialogue. Do NOT have the characters speak the directions out loud. The goal is a realistic, engaging conversation.
+IMPORTANT: Subtly weave in emotional cues or stage directions (in parentheses) where they enhance the performance, but use them sparingly. These cues should NOT be spoken by the characters. The goal is a natural, engaging conversation.
 
 User Prompt:
 "{{{prompt}}}"
