@@ -52,8 +52,7 @@ const generateSkitFlow = ai.defineFlow(
 
       const characterInfo = input.characterVoices[character];
       if (!characterInfo) {
-        console.warn(`No voice assigned for character: ${character}. Skipping line.`);
-        return { buffer: null, index };
+        throw new Error(`Character "${character}" is used in the script but not defined in the Control Panel. Please add this character or correct the name.`);
       }
       
       const { voice, persona } = characterInfo;

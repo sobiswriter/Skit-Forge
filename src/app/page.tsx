@@ -144,12 +144,12 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
       } else {
         throw new Error("Audio generation failed to produce a result.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating skit:", error);
       toast({
         variant: "destructive",
         title: "Generation Failed",
-        description: "Something went wrong. Please check the script format (e.g., 'Character:') and try again.",
+        description: error.message || "Something went wrong. Please check the script format (e.g., 'Character:') and try again.",
       });
     } finally {
       setIsLoading(false);
