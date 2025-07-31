@@ -37,23 +37,22 @@ const generateSkitFlow = ai.defineFlow(
   },
   async input => {
     const scriptLines = input.script.split('\n').filter(line => line.trim() !== '');
-    const audioBuffers: Buffer[] = [];
 
-    for (const line of scriptLines) {
+    const audioPromises = scriptLines.map(async (line, index) => {
       const parts = line.split(/:(.*)/s);
-      if (parts.length < 2) continue;
+      if (parts.length < 2) return { buffer: null, index };
 
       const character = parts[0].trim();
       const dialogue = parts[1].trim();
       
       if (!character || !dialogue) {
-        continue;
+        return { buffer: null, index };
       }
 
       const characterInfo = input.characterVoices[character];
       if (!characterInfo) {
         console.warn(`No voice assigned for character: ${character}. Skipping line.`);
-        continue;
+        return { buffer: null, index };
       }
       
       const { voice, persona } = characterInfo;
@@ -62,37 +61,50 @@ const generateSkitFlow = ai.defineFlow(
         ? `(Speaking as ${character}, with the persona: ${persona}) ${dialogue}`
         : dialogue;
 
-      const {media} = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts',
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {voiceName: voice},
+      try {
+        const {media} = await ai.generate({
+          model: 'googleai/gemini-2.5-flash-preview-tts',
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {voiceName: voice},
+              },
             },
           },
-        },
-        prompt: prompt,
-      });
+          prompt: prompt,
+        });
 
-      if (!media) {
-        console.error(`Failed to generate audio for line: ${line}`);
-        continue;
+        if (!media) {
+          console.error(`Failed to generate audio for line: ${line}`);
+          return { buffer: null, index };
+        }
+
+        const audioBuffer = Buffer.from(
+          media.url.substring(media.url.indexOf(',') + 1),
+          'base64'
+        );
+        return { buffer: audioBuffer, index };
+      } catch (error) {
+        console.error(`Error generating audio for line "${line}":`, error);
+        return { buffer: null, index };
       }
+    });
 
-      const audioBuffer = Buffer.from(
-        media.url.substring(media.url.indexOf(',') + 1),
-        'base64'
-      );
-      audioBuffers.push(audioBuffer);
-    }
+    const results = await Promise.all(audioPromises);
 
-    if (audioBuffers.length === 0) {
+    const orderedBuffers = results
+        .sort((a, b) => a.index - b.index)
+        .map(r => r.buffer)
+        .filter((b): b is Buffer => b !== null);
+
+
+    if (orderedBuffers.length === 0) {
         throw new Error("No audio could be generated from the script. Please check the script format.");
     }
 
     // Concatenate audio buffers
-    const concatenatedAudio = Buffer.concat(audioBuffers);
+    const concatenatedAudio = Buffer.concat(orderedBuffers);
 
     // Convert to WAV format
     const wavDataUri = 'data:audio/wav;base64,' + (await toWav(concatenatedAudio));
