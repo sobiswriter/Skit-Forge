@@ -76,8 +76,7 @@ const generateSkitFlow = ai.defineFlow(
         });
 
         if (!media) {
-          console.error(`Failed to generate audio for line: ${line}`);
-          return { buffer: null, index };
+          throw new Error(`Model returned no media for line: "${line}"`);
         }
 
         const audioBuffer = Buffer.from(
@@ -85,20 +84,35 @@ const generateSkitFlow = ai.defineFlow(
           'base64'
         );
         return { buffer: audioBuffer, index };
-      } catch (error) {
-        console.error(`Error generating audio for line "${line}":`, error);
-        return { buffer: null, index };
+      } catch (error: any) {
+         console.error(`Error generating audio for line "${line}":`, error);
+         // Re-throw the error with more context to be caught by the front-end
+         throw new Error(`Failed to generate audio for line: "${line}". Reason: ${error.message}`);
       }
     });
 
-    const results = await Promise.all(audioPromises);
+    const results = await Promise.all(
+        audioPromises.map(p => p.catch(e => e))
+    );
 
-    const orderedBuffers = results
+    const successfulResults = results.filter(r => !(r instanceof Error) && r.buffer);
+    const errors = results.filter(r => r instanceof Error);
+
+    if (errors.length > 0) {
+        // If there are any errors, we should report the first one.
+        throw new Error(errors[0].message);
+    }
+    
+    if (successfulResults.length === 0) {
+        throw new Error("No audio could be generated from the script. Please check the script format and that all characters are defined.");
+    }
+
+    const orderedBuffers = successfulResults
         .sort((a, b) => a.index - b.index)
         .map(r => r.buffer)
         .filter((b): b is Buffer => b !== null);
 
-
+    // This check is now somewhat redundant but good for safety.
     if (orderedBuffers.length === 0) {
         throw new Error("No audio could be generated from the script. Please check the script format.");
     }
