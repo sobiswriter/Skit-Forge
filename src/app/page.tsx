@@ -16,6 +16,7 @@ interface Character {
     id: number;
     name: string;
     voice: string;
+    persona: string;
 }
 
 let nextId = 3;
@@ -31,9 +32,9 @@ Robot: I have generated 1,200 unique audio dramas in the last 24 hours. They are
 P1: Okay, I'm sold. I'm trying this out right now.`
   );
   const [characters, setCharacters] = useState<Character[]>([
-    { id: 1, name: "P1", voice: GEMINI_VOICES[0].id },
-    { id: 2, name: "Anna", voice: GEMINI_VOICES[1].id },
-    { id: 0, name: "Robot", voice: GEMINI_VOICES[2].id },
+    { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "Sounds excited and curious." },
+    { id: 2, name: "Anna", voice: GEMINI_VOICES[1].id, persona: "Friendly and enthusiastic." },
+    { id: 0, name: "Robot", voice: GEMINI_VOICES[2].id, persona: "Monotone, logical, and factual." },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -47,6 +48,7 @@ P1: Okay, I'm sold. I'm trying this out right now.`
         id: nextId++,
         name: newCharacterName,
         voice: GEMINI_VOICES[characters.length % GEMINI_VOICES.length].id,
+        persona: "",
       },
     ]);
   };
@@ -55,7 +57,7 @@ P1: Okay, I'm sold. I'm trying this out right now.`
     setCharacters(characters.filter((char) => char.id !== id));
   };
 
-  const handleCharacterChange = (id: number, field: 'name' | 'voice', value: string) => {
+  const handleCharacterChange = (id: number, field: 'name' | 'voice' | 'persona', value: string) => {
     setCharacters(
       characters.map((char) =>
         char.id === id ? { ...char, [field]: value } : char
@@ -76,10 +78,10 @@ P1: Okay, I'm sold. I'm trying this out right now.`
     
     const characterVoices = characters.reduce((acc, char) => {
       if (char.name) {
-        acc[char.name] = char.voice;
+        acc[char.name] = { voice: char.voice, persona: char.persona };
       }
       return acc;
-    }, {} as Record<string, string>);
+    }, {} as Record<string, { voice: string; persona: string }>);
 
 
     setIsLoading(true);
@@ -139,7 +141,7 @@ P1: Okay, I'm sold. I'm trying this out right now.`
 P2: Hi there, how are you?"
                 value={script}
                 onChange={handleScriptChange}
-                className="min-h-[400px] md:min-h-[500px] text-base resize-none bg-background/50 focus:bg-background"
+                className="min-h-[400px] md:min-h-[600px] text-base resize-none bg-background/50 focus:bg-background"
                 disabled={isLoading}
               />
             </CardContent>
@@ -151,9 +153,9 @@ P2: Hi there, how are you?"
           <Card className="sticky top-8 bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader>
               <CardTitle>Control Panel</CardTitle>
-              <CardDescription>Manage characters and their voices.</CardDescription>
+              <CardDescription>Manage characters, voices, and personas.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-h-[350px] overflow-y-auto pr-3">
+            <CardContent className="space-y-4 max-h-[450px] overflow-y-auto pr-3">
               {characters.map((char) => (
                 <div key={char.id} className="space-y-3 p-3 border rounded-md relative">
                    <Button
@@ -173,6 +175,17 @@ P2: Hi there, how are you?"
                       value={char.name}
                       onChange={(e) => handleCharacterChange(char.id, 'name', e.target.value)}
                       placeholder="e.g., Narrator"
+                      disabled={isLoading}
+                    />
+                  </div>
+                   <div className="space-y-1">
+                    <Label htmlFor={`persona-${char.id}`}>Persona (Instructions)</Label>
+                    <Textarea
+                      id={`persona-${char.id}`}
+                      value={char.persona}
+                      onChange={(e) => handleCharacterChange(char.id, 'persona', e.target.value)}
+                      placeholder="e.g., Witty and sarcastic"
+                      className="text-sm min-h-[60px]"
                       disabled={isLoading}
                     />
                   </div>

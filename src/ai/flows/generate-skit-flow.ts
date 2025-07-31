@@ -13,7 +13,10 @@ import wav from 'wav';
 
 const GenerateSkitInputSchema = z.object({
   script: z.string().describe('The script for the skit.'),
-  characterVoices: z.record(z.string(), z.string()).describe('A map of character names to voice names.'),
+  characterVoices: z.record(z.string(), z.object({
+    voice: z.string(),
+    persona: z.string(),
+  })).describe('A map of character names to their voice and persona.'),
 });
 export type GenerateSkitInput = z.infer<typeof GenerateSkitInputSchema>;
 
@@ -42,11 +45,17 @@ const generateSkitFlow = ai.defineFlow(
         continue;
       }
 
-      const voiceName = input.characterVoices[character];
-      if (!voiceName) {
+      const characterInfo = input.characterVoices[character];
+      if (!characterInfo) {
         console.warn(`No voice assigned for character: ${character}. Skipping line.`);
         continue;
       }
+      
+      const { voice, persona } = characterInfo;
+
+      const prompt = persona 
+        ? `(Speaking as ${character}, with the persona: ${persona}) ${dialogue}`
+        : `${character}: ${dialogue}`;
 
       const {media} = await ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
@@ -54,11 +63,11 @@ const generateSkitFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: {voiceName: voiceName},
+              prebuiltVoiceConfig: {voiceName: voice},
             },
           },
         },
-        prompt: `${character}: ${dialogue}`,
+        prompt: prompt,
       });
 
       if (!media) {
