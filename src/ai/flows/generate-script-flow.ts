@@ -9,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {googleAI} from '@genkit-ai/googleai';
 
 const GenerateScriptInputSchema = z.object({
   prompt: z.string().describe('The user prompt for the script.'),
@@ -16,6 +17,7 @@ const GenerateScriptInputSchema = z.object({
     name: z.string(),
     persona: z.string(),
   })).describe('A list of characters with their name and persona.'),
+  model: z.string().describe('The name of the model to use for generation.'),
 });
 export type GenerateScriptInput = z.infer<typeof GenerateScriptInputSchema>;
 
@@ -36,7 +38,7 @@ const scriptPrompt = ai.definePrompt({
 
 You MUST use the characters provided and adhere to their specified personas. The script should be formatted with each line as 'CharacterName: Dialogue'.
 
-IMPORTANT: Use emotional cues or stage directions (in parentheses) sparingly, and only when the tone is not obvious from the dialogue itself. Do NOT have the characters speak the directions out loud. The goal is a realistic, engaging conversation.
+IMPORTANT: Use emotional cues or stage directions (in parentheses) sparingly, and only when the tone is not obvious from the dialogue. Do NOT have the characters speak the directions out loud. The goal is a realistic, engaging conversation.
 
 User Prompt:
 "{{{prompt}}}"
@@ -57,7 +59,7 @@ const generateScriptFlow = ai.defineFlow(
     outputSchema: GenerateScriptOutputSchema,
   },
   async (input) => {
-    const {output} = await scriptPrompt(input);
+    const {output} = await scriptPrompt(input, {model: googleAI.model(input.model as any)});
     return output!;
   }
 );

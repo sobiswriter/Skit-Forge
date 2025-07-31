@@ -20,32 +20,33 @@ interface Character {
     persona: string;
 }
 
+const SCRIPT_MODELS = [
+    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
+    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
+];
+
 const TTS_MODELS = [
-    { id: "gemini-2.5-flash-preview-tts", name: "Gemini 2.5 Flash TTS" },
+    { id: "gemini-2.5-flash-preview-tts", name: "Gemini 2.5 Flash Preview TTS" },
+    { id: "gemini-2.5-pro-preview-tts", name: "Gemini 2.5 Pro Preview TTS" },
 ];
 
 let nextId = 3;
 
 export default function Home() {
-  const [scriptPrompt, setScriptPrompt] = useState("A short, funny debate between a robot and a human about whether pineapple belongs on pizza.");
+  const [scriptPrompt, setScriptPrompt] = useState("A short, funny debate about whether pineapple belongs on pizza.");
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [script, setScript] = useState(
 `P1: Hey, did you see that new AI tool, SkitForge?
-Anna: Oh, the one that generates dialogue? I tried it yesterday. It's surprisingly good!
-Robot: (calmly) Affirmative. My analysis indicates a 98.7% increase in creative workflow efficiency.
-P1: Wow, even the robot is impressed. What did you make, Anna?
-Anna: (excitedly) I wrote a short scene for my animation project. The voice acting was perfect for the initial storyboard. Saved me a ton of time.
-Robot: (matter-of-factly) I have generated 1,200 unique audio dramas in the last 24 hours. They are... compelling.
-P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
+Anna: Oh, the one that generates dialogue? I tried it yesterday. It's surprisingly good!`
   );
   const [characters, setCharacters] = useState<Character[]>([
     { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "Sounds excited and curious." },
     { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, persona: "Friendly and enthusiastic." },
-    { id: 0, name: "Robot", voice: GEMINI_VOICES[2].id, persona: "Monotone, logical, and factual." },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState(TTS_MODELS[0].id);
+  const [selectedScriptModel, setSelectedScriptModel] = useState(SCRIPT_MODELS[0].id);
+  const [selectedTtsModel, setSelectedTtsModel] = useState(TTS_MODELS[0].id);
   const { toast } = useToast();
 
   const handleAddCharacter = () => {
@@ -88,6 +89,7 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
       const result = await generateScript({
         prompt: scriptPrompt,
         characters: characterData,
+        model: selectedScriptModel,
       });
       if (result.script) {
         setScript(result.script);
@@ -132,7 +134,7 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
     setIsLoading(true);
     setAudioUrl(null);
     try {
-      const result = await generateSkit({ script, characterVoices, model: selectedModel });
+      const result = await generateSkit({ script, characterVoices, model: selectedTtsModel });
       if (result.audioDataUri) {
         setAudioUrl(result.audioDataUri);
         toast({
@@ -183,15 +185,38 @@ P1: (convinced) Okay, I'm sold. I'm trying this out right now.`
                         Give the AI a prompt and it will write a script for you using your characters.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <Textarea
-                        placeholder="e.g., A debate between a cat and a dog about who is the better pet."
-                        value={scriptPrompt}
-                        onChange={(e) => setScriptPrompt(e.target.value)}
-                        className="text-base resize-none bg-background/50 focus:bg-background"
-                        disabled={isGeneratingScript || isLoading}
-                        rows={3}
-                    />
+                <CardContent className="space-y-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="script-model">Script Model</Label>
+                        <Select
+                        value={selectedScriptModel}
+                        onValueChange={setSelectedScriptModel}
+                        disabled={isLoading || isGeneratingScript}
+                        >
+                        <SelectTrigger id="script-model">
+                            <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {SCRIPT_MODELS.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                                {model.name}
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor="script-prompt">Prompt</Label>
+                        <Textarea
+                            id="script-prompt"
+                            placeholder="e.g., A debate between a cat and a dog about who is the better pet."
+                            value={scriptPrompt}
+                            onChange={(e) => setScriptPrompt(e.target.value)}
+                            className="text-base resize-none bg-background/50 focus:bg-background"
+                            disabled={isGeneratingScript || isLoading}
+                            rows={3}
+                        />
+                    </div>
                 </CardContent>
                 <CardFooter>
                      <Button onClick={handleAiGenerateScript} disabled={isGeneratingScript || isLoading || characters.length === 0} className="w-full sm:w-auto">
@@ -238,8 +263,8 @@ P2: Hi there, how are you?"
               <div className="space-y-1">
                 <Label htmlFor="tts-model">Audio Model</Label>
                 <Select
-                  value={selectedModel}
-                  onValueChange={setSelectedModel}
+                  value={selectedTtsModel}
+                  onValueChange={setSelectedTtsModel}
                   disabled={isLoading || isGeneratingScript}
                 >
                   <SelectTrigger id="tts-model">
