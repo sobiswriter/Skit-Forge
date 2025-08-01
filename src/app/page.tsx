@@ -1,23 +1,31 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useEffect } from "react";
 import { generateSkit } from "@/ai/flows/generate-skit-flow";
 import { generateScript } from "@/ai/flows/generate-script-flow";
+import { suggestVoice } from "@/ai/flows/suggest-voice-flow";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { GEMINI_VOICES, groupedVoices } from "@/lib/constants";
-import { Loader2, Clapperboard, Download, Plus, Trash2, Sparkles } from "lucide-react";
+import { Loader2, Clapperboard, Download, Plus, Trash2, Sparkles, Wand2, BookUser } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface Character {
     id: number;
     name: string;
     voice: string;
-    persona: string;
+    personaId: string;
+}
+
+interface Persona {
+    id: string;
+    name: string;
+    description: string;
 }
 
 const SCRIPT_MODELS = [
@@ -41,15 +49,48 @@ Anna: (Cheerfully) Oh, come on! We're building worlds with words here. What's no
 P1: (Skeptical) An AI writing scripts? Sounds like a shortcut to soulless content.
 Anna: I thought so too, but you should hear it! The voices sound so natural. (Excitedly) We should give it a try for the podcast!`
   );
-  const [characters, setCharacters] = useState<Character[]>([
-    { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, persona: "A bit jaded and skeptical, but secretly curious." },
-    { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, persona: "Friendly, enthusiastic, and optimistic about technology." },
-  ]);
+  
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuggestingVoice, setIsSuggestingVoice] = useState<number | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [selectedScriptModel, setSelectedScriptModel] = useState(SCRIPT_MODELS[0].id);
   const [selectedTtsModel, setSelectedTtsModel] = useState(TTS_MODELS[0].id);
   const { toast } = useToast();
+
+  const [isPersonaDialogOpen, setIsPersonaDialogOpen] = useState(false);
+  const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
+  const [newPersonaName, setNewPersonaName] = useState("");
+  const [newPersonaDescription, setNewPersonaDescription] = useState("");
+
+  useEffect(() => {
+    const savedPersonas = localStorage.getItem("skitforge_personas");
+    if (savedPersonas) {
+      setPersonas(JSON.parse(savedPersonas));
+    } else {
+      // Create default personas if none exist
+      const defaultPersonas: Persona[] = [
+        { id: 'p1-default', name: 'Skeptical Coder', description: 'A talented but slightly jaded and cynical software developer who questions the utility of new technologies.' },
+        { id: 'anna-default', name: 'Tech Optimist', description: 'A friendly, enthusiastic, and cheerful person who is optimistic about how technology can improve creative work.' },
+      ];
+      setPersonas(defaultPersonas);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("skitforge_personas", JSON.stringify(personas));
+  }, [personas]);
+
+   useEffect(() => {
+    if (personas.length > 1) {
+      setCharacters([
+        { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, personaId: personas[0].id },
+        { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, personaId: personas[1].id },
+      ]);
+    }
+  }, [personas.length]);
 
   const handleAddCharacter = () => {
     const newCharacterName = `Character ${characters.length + 1}`;
@@ -59,7 +100,7 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
         id: nextId++,
         name: newCharacterName,
         voice: GEMINI_VOICES[characters.length % GEMINI_VOICES.length].id,
-        persona: "",
+        personaId: personas[0]?.id || "",
       },
     ]);
   };
@@ -68,12 +109,38 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
     setCharacters(characters.filter((char) => char.id !== id));
   };
 
-  const handleCharacterChange = (id: number, field: 'name' | 'voice' | 'persona', value: string) => {
+  const handleCharacterChange = (id: number, field: 'name' | 'voice' | 'personaId', value: string) => {
     setCharacters(
       characters.map((char) =>
         char.id === id ? { ...char, [field]: value } : char
       )
     );
+  };
+  
+  const handleSuggestVoice = async (characterId: number) => {
+    const character = characters.find(c => c.id === characterId);
+    if (!character || !character.personaId) {
+        toast({ variant: 'destructive', title: 'No Persona Selected', description: 'Please select a persona for the character first.' });
+        return;
+    }
+    const persona = personas.find(p => p.id === character.personaId);
+    if (!persona) return;
+
+    setIsSuggestingVoice(characterId);
+    try {
+        const result = await suggestVoice({ persona: persona.description });
+        if (result.voiceId && GEMINI_VOICES.some(v => v.id === result.voiceId)) {
+            handleCharacterChange(characterId, 'voice', result.voiceId);
+            toast({ title: 'Voice Suggested!', description: `AI recommended a voice for ${character.name}.` });
+        } else {
+            throw new Error('AI returned an invalid voice ID.');
+        }
+    } catch (error) {
+        console.error("Error suggesting voice:", error);
+        toast({ variant: 'destructive', title: 'Suggestion Failed', description: 'Could not suggest a voice at this time.' });
+    } finally {
+        setIsSuggestingVoice(null);
+    }
   };
 
   const handleAiGenerateScript = async () => {
@@ -87,7 +154,10 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
     }
     setIsGeneratingScript(true);
     try {
-      const characterData = characters.map(({ name, persona }) => ({ name, persona }));
+      const characterData = characters.map(({ name, personaId }) => {
+        const persona = personas.find(p => p.id === personaId);
+        return { name, persona: persona?.description || "" };
+      });
       const result = await generateScript({
         prompt: scriptPrompt,
         characters: characterData,
@@ -127,7 +197,8 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
     
     const characterVoices = characters.reduce((acc, char) => {
       if (char.name) {
-        acc[char.name] = { voice: char.voice, persona: char.persona };
+        const persona = personas.find(p => p.id === char.personaId);
+        acc[char.name] = { voice: char.voice, persona: persona?.description || "" };
       }
       return acc;
     }, {} as Record<string, { voice: string; persona: string }>);
@@ -165,8 +236,41 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
     }
   };
 
+  const handleSavePersona = () => {
+    if (!newPersonaName.trim() || !newPersonaDescription.trim()) {
+        toast({ variant: 'destructive', title: 'Incomplete Persona', description: 'Please provide both a name and a description.' });
+        return;
+    }
+    if (editingPersona) {
+        setPersonas(personas.map(p => p.id === editingPersona.id ? { ...p, name: newPersonaName, description: newPersonaDescription } : p));
+    } else {
+        setPersonas([...personas, { id: crypto.randomUUID(), name: newPersonaName, description: newPersonaDescription }]);
+    }
+    setEditingPersona(null);
+    setNewPersonaName("");
+    setNewPersonaDescription("");
+  };
+
+  const handleEditPersona = (persona: Persona) => {
+    setEditingPersona(persona);
+    setNewPersonaName(persona.name);
+    setNewPersonaDescription(persona.description);
+  };
+
+  const handleDeletePersona = (id: string) => {
+    setPersonas(personas.filter(p => p.id !== id));
+  };
+  
+  const openAddPersona = () => {
+    setEditingPersona(null);
+    setNewPersonaName("");
+    setNewPersonaDescription("");
+  };
+
+  const disabled = isLoading || isGeneratingScript;
+
   return (
-    <main className="min-h-screen container mx-auto p-4 md:p-8">
+    <main className="min-h-screen container mx-auto p-4 md:p-8 2xl:max-w-7xl">
       <header className="flex items-center gap-3 mb-8">
         <Clapperboard className="w-8 h-8 text-primary" />
         <h1 className="text-4xl font-bold font-headline tracking-tight text-white">
@@ -193,7 +297,7 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
                         <Select
                         value={selectedScriptModel}
                         onValueChange={setSelectedScriptModel}
-                        disabled={isLoading || isGeneratingScript}
+                        disabled={disabled}
                         >
                         <SelectTrigger id="script-model">
                             <SelectValue placeholder="Select a model" />
@@ -215,13 +319,13 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
                             value={scriptPrompt}
                             onChange={(e) => setScriptPrompt(e.target.value)}
                             className="text-base resize-none bg-background/50 focus:bg-background"
-                            disabled={isGeneratingScript || isLoading}
+                            disabled={disabled}
                             rows={3}
                         />
                     </div>
                 </CardContent>
                 <CardFooter>
-                     <Button onClick={handleAiGenerateScript} disabled={isGeneratingScript || isLoading || characters.length === 0} className="w-full sm:w-auto">
+                     <Button onClick={handleAiGenerateScript} disabled={disabled || characters.length === 0} className="w-full sm:w-auto">
                         {isGeneratingScript ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -244,11 +348,11 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
             <CardContent>
               <Textarea
                 placeholder="P1: Hello world!
-P2: Hi there, how are you?"
+Anna: Hi there, how are you?"
                 value={script}
                 onChange={handleScriptChange}
                 className="min-h-[400px] md:min-h-[500px] text-base resize-none bg-background/50 focus:bg-background"
-                disabled={isLoading || isGeneratingScript}
+                disabled={disabled}
               />
             </CardContent>
           </Card>
@@ -259,7 +363,7 @@ P2: Hi there, how are you?"
           <Card className="sticky top-8 bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader>
               <CardTitle>Control Panel</CardTitle>
-              <CardDescription>Manage characters, voices, and personas.</CardDescription>
+              <CardDescription>Manage characters, voices, and generate your skit.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-h-[450px] overflow-y-auto pr-3">
               <div className="space-y-1">
@@ -267,7 +371,7 @@ P2: Hi there, how are you?"
                 <Select
                   value={selectedTtsModel}
                   onValueChange={setSelectedTtsModel}
-                  disabled={isLoading || isGeneratingScript}
+                  disabled={disabled}
                 >
                   <SelectTrigger id="tts-model">
                     <SelectValue placeholder="Select a model" />
@@ -281,6 +385,61 @@ P2: Hi there, how are you?"
                   </SelectContent>
                 </Select>
               </div>
+
+               <Dialog open={isPersonaDialogOpen} onOpenChange={setIsPersonaDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full">
+                        <BookUser className="mr-2 h-4 w-4" />
+                        Manage Personas
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[625px]">
+                    <DialogHeader>
+                    <DialogTitle>{editingPersona ? 'Edit Persona' : 'Persona Library'}</DialogTitle>
+                    <DialogDescription>
+                        {editingPersona ? 'Update the details for this persona.' : 'Create, edit, and manage reusable character personas for your skits.'}
+                    </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                        <div className="space-y-4">
+                             <h3 className="font-medium text-lg">{editingPersona ? 'Edit Form' : 'Add New Persona'}</h3>
+                            <div className="space-y-2">
+                                <Label htmlFor="persona-name">Persona Name</Label>
+                                <Input id="persona-name" value={newPersonaName} onChange={(e) => setNewPersonaName(e.target.value)} placeholder="e.g., Grumpy Cat" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="persona-desc">Persona Description</Label>
+                                <Textarea id="persona-desc" value={newPersonaDescription} onChange={(e) => setNewPersonaDescription(e.target.value)} placeholder="e.g., A cynical cat who secretly enjoys poetry." className="min-h-[120px]"/>
+                            </div>
+                             <Button onClick={handleSavePersona}>{editingPersona ? 'Save Changes' : 'Add Persona'}</Button>
+                             {editingPersona && <Button variant="ghost" onClick={() => setEditingPersona(null)}>Cancel Edit</Button>}
+                        </div>
+                        <div className="space-y-3">
+                            <h3 className="font-medium text-lg">Saved Personas</h3>
+                            <div className="max-h-[250px] overflow-y-auto space-y-2 pr-2">
+                            {personas.length === 0 && <p className="text-sm text-muted-foreground">No personas created yet.</p>}
+                            {personas.map(p => (
+                                <div key={p.id} className="flex justify-between items-center p-2 border rounded-md">
+                                    <span className="font-medium">{p.name}</span>
+                                    <div className="flex gap-1">
+                                        <Button size="sm" variant="ghost" onClick={() => handleEditPersona(p)}>Edit</Button>
+                                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeletePersona(p.id)}>Delete</Button>
+                                    </div>
+                                </div>
+                            ))}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="outline" onClick={() => setIsPersonaDialogOpen(false)}>Close</Button>
+                        </DialogClose>
+                    </DialogFooter>
+                </DialogContent>
+                </Dialog>
+
               {characters.map((char) => (
                 <div key={char.id} className="space-y-3 p-3 border rounded-md relative">
                    <Button
@@ -288,7 +447,7 @@ P2: Hi there, how are you?"
                     size="icon"
                     className="absolute top-1 right-1 h-7 w-7 text-muted-foreground hover:text-destructive"
                     onClick={() => handleRemoveCharacter(char.id)}
-                    disabled={isLoading || isGeneratingScript}
+                    disabled={disabled}
                   >
                     <Trash2 className="h-4 w-4" />
                     <span className="sr-only">Remove {char.name}</span>
@@ -300,53 +459,66 @@ P2: Hi there, how are you?"
                       value={char.name}
                       onChange={(e) => handleCharacterChange(char.id, 'name', e.target.value)}
                       placeholder="e.g., Narrator"
-                      disabled={isLoading || isGeneratingScript}
+                      disabled={disabled}
                     />
                   </div>
                    <div className="space-y-1">
-                    <Label htmlFor={`persona-${char.id}`}>Persona (Instructions)</Label>
-                    <Textarea
-                      id={`persona-${char.id}`}
-                      value={char.persona}
-                      onChange={(e) => handleCharacterChange(char.id, 'persona', e.target.value)}
-                      placeholder="e.g., Witty and sarcastic"
-                      className="text-sm min-h-[60px]"
-                      disabled={isLoading || isGeneratingScript}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor={`voice-${char.id}`}>Voice</Label>
+                    <Label htmlFor={`persona-${char.id}`}>Persona</Label>
                     <Select
-                      value={char.voice}
-                      onValueChange={(value) => handleCharacterChange(char.id, 'voice', value)}
-                      disabled={isLoading || isGeneratingScript}
+                        value={char.personaId}
+                        onValueChange={(value) => handleCharacterChange(char.id, 'personaId', value)}
+                        disabled={disabled}
                     >
-                      <SelectTrigger id={`voice-${char.id}`}>
-                        <SelectValue placeholder="Select a voice" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(groupedVoices).map(([gender, voices]) => (
-                          <SelectGroup key={gender}>
-                            <SelectLabel>{gender}</SelectLabel>
-                            {voices.map((voice) => (
-                              <SelectItem key={voice.id} value={voice.id}>
-                                {voice.name}
+                        <SelectTrigger id={`persona-${char.id}`}>
+                            <SelectValue placeholder="Select a persona" />
+                        </SelectTrigger>
+                        <SelectContent>
+                             {personas.map((persona) => (
+                              <SelectItem key={persona.id} value={persona.id}>
+                                {persona.name}
                               </SelectItem>
                             ))}
-                          </SelectGroup>
-                        ))}
-                      </SelectContent>
+                        </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Voice</Label>
+                     <div className="flex gap-2">
+                        <Select
+                        value={char.voice}
+                        onValueChange={(value) => handleCharacterChange(char.id, 'voice', value)}
+                        disabled={disabled}
+                        >
+                        <SelectTrigger id={`voice-${char.id}`}>
+                            <SelectValue placeholder="Select a voice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Object.entries(groupedVoices).map(([gender, voices]) => (
+                            <SelectGroup key={gender}>
+                                <SelectLabel>{gender}</SelectLabel>
+                                {voices.map((voice) => (
+                                <SelectItem key={voice.id} value={voice.id}>
+                                    {voice.name}
+                                </SelectItem>
+                                ))}
+                            </SelectGroup>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        <Button variant="outline" size="icon" onClick={() => handleSuggestVoice(char.id)} disabled={disabled || isSuggestingVoice !== null} title="Suggest a Voice">
+                           {isSuggestingVoice === char.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Wand2 className="h-4 w-4" />}
+                        </Button>
+                    </div>
                   </div>
                 </div>
               ))}
-               <Button onClick={handleAddCharacter} variant="outline" className="w-full" disabled={isLoading || isGeneratingScript}>
+               <Button onClick={handleAddCharacter} variant="outline" className="w-full" disabled={disabled}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Character
               </Button>
             </CardContent>
             <CardFooter className="flex flex-col gap-4 pt-6">
-              <Button onClick={handleGenerateSkit} disabled={isLoading || isGeneratingScript || characters.length === 0} className="w-full text-lg py-6">
+              <Button onClick={handleGenerateSkit} disabled={disabled || characters.length === 0} className="w-full text-lg py-6">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
