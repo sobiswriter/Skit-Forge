@@ -84,13 +84,13 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
   }, [personas]);
 
    useEffect(() => {
-    if (personas.length > 1) {
+    if (personas.length > 0 && characters.length === 0) {
       setCharacters([
         { id: 1, name: "P1", voice: GEMINI_VOICES[0].id, personaId: personas[0].id },
-        { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, personaId: personas[1].id },
+        { id: 2, name: "Anna", voice: GEMINI_VOICES[15].id, personaId: personas[1]?.id || personas[0].id },
       ]);
     }
-  }, [personas.length]);
+   }, [personas, characters.length]);
 
   const handleAddCharacter = () => {
     const newCharacterName = `Character ${characters.length + 1}`;
@@ -243,8 +243,10 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
     }
     if (editingPersona) {
         setPersonas(personas.map(p => p.id === editingPersona.id ? { ...p, name: newPersonaName, description: newPersonaDescription } : p));
+        toast({ title: 'Persona Updated!', description: `The "${newPersonaName}" persona has been saved.`});
     } else {
         setPersonas([...personas, { id: crypto.randomUUID(), name: newPersonaName, description: newPersonaDescription }]);
+        toast({ title: 'Persona Added!', description: `The "${newPersonaName}" persona is now in your library.`});
     }
     setEditingPersona(null);
     setNewPersonaName("");
@@ -259,6 +261,7 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
 
   const handleDeletePersona = (id: string) => {
     setPersonas(personas.filter(p => p.id !== id));
+    toast({ title: 'Persona Deleted', variant: 'destructive' });
   };
   
   const openAddPersona = () => {
@@ -270,7 +273,7 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
   const disabled = isLoading || isGeneratingScript;
 
   return (
-    <main className="min-h-screen container mx-auto p-4 md:p-8 2xl:max-w-7xl">
+    <main className="min-h-screen container mx-auto p-4 md:p-8 2xl:max-w-[90rem]">
       <header className="flex items-center gap-3 mb-8">
         <Clapperboard className="w-8 h-8 text-primary" />
         <h1 className="text-4xl font-bold font-headline tracking-tight text-white">
@@ -278,9 +281,9 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
         </h1>
       </header>
 
-      <div className="flex flex-col md:flex-row gap-8 md:items-start">
+      <div className="flex flex-col md:flex-row gap-8">
         {/* Left Column: Script Editor */}
-        <div className="md:w-[65%] lg:w-[70%] space-y-8">
+        <div className="md:w-[60%] lg:w-[65%] space-y-8 flex flex-col">
             <Card className="bg-card/80 backdrop-blur-sm border-border/50">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -338,20 +341,20 @@ Anna: I thought so too, but you should hear it! The voices sound so natural. (Ex
                 </CardFooter>
             </Card>
 
-          <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50">
+          <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50 flex-grow flex flex-col">
              <CardHeader>
                 <CardTitle>Script Editor</CardTitle>
                 <CardDescription>
                   Write your script below or generate one with AI. Use the format `Character: Dialogue`.
                 </CardDescription>
               </CardHeader>
-            <CardContent>
+            <CardContent className="flex-grow">
               <Textarea
                 placeholder="P1: Hello world!
 Anna: Hi there, how are you?"
                 value={script}
                 onChange={handleScriptChange}
-                className="min-h-[400px] md:min-h-[500px] text-base resize-none bg-background/50 focus:bg-background"
+                className="h-full text-base resize-none bg-background/50 focus:bg-background"
                 disabled={disabled}
               />
             </CardContent>
@@ -359,13 +362,13 @@ Anna: Hi there, how are you?"
         </div>
 
         {/* Right Column: Control Panel */}
-        <div className="md:w-[35%] lg:w-[30%]">
-          <Card className="sticky top-8 bg-card/80 backdrop-blur-sm border-border/50">
+        <div className="md:w-[40%] lg:w-[35%]">
+          <Card className="sticky top-8 bg-card/80 backdrop-blur-sm border-border/50 h-full flex flex-col">
             <CardHeader>
               <CardTitle>Control Panel</CardTitle>
               <CardDescription>Manage characters, voices, and generate your skit.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-h-[450px] overflow-y-auto pr-3">
+            <CardContent className="space-y-4 flex-grow overflow-y-auto pr-3">
               <div className="space-y-1">
                 <Label htmlFor="tts-model">Audio Model</Label>
                 <Select
@@ -388,7 +391,7 @@ Anna: Hi there, how are you?"
 
                <Dialog open={isPersonaDialogOpen} onOpenChange={setIsPersonaDialogOpen}>
                 <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full">
+                    <Button variant="outline" className="w-full" onClick={openAddPersona}>
                         <BookUser className="mr-2 h-4 w-4" />
                         Manage Personas
                     </Button>
@@ -402,7 +405,7 @@ Anna: Hi there, how are you?"
                     </DialogHeader>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                        <div className="space-y-4">
+                        <div className="space-y-4 border-r-0 md:border-r md:pr-6">
                              <h3 className="font-medium text-lg">{editingPersona ? 'Edit Form' : 'Add New Persona'}</h3>
                             <div className="space-y-2">
                                 <Label htmlFor="persona-name">Persona Name</Label>
@@ -412,16 +415,18 @@ Anna: Hi there, how are you?"
                                 <Label htmlFor="persona-desc">Persona Description</Label>
                                 <Textarea id="persona-desc" value={newPersonaDescription} onChange={(e) => setNewPersonaDescription(e.target.value)} placeholder="e.g., A cynical cat who secretly enjoys poetry." className="min-h-[120px]"/>
                             </div>
-                             <Button onClick={handleSavePersona}>{editingPersona ? 'Save Changes' : 'Add Persona'}</Button>
-                             {editingPersona && <Button variant="ghost" onClick={() => setEditingPersona(null)}>Cancel Edit</Button>}
+                             <div className="flex gap-2">
+                                <Button onClick={handleSavePersona}>{editingPersona ? 'Save Changes' : 'Add Persona'}</Button>
+                                {editingPersona && <Button variant="ghost" onClick={() => setEditingPersona(null)}>Cancel Edit</Button>}
+                             </div>
                         </div>
                         <div className="space-y-3">
                             <h3 className="font-medium text-lg">Saved Personas</h3>
                             <div className="max-h-[250px] overflow-y-auto space-y-2 pr-2">
                             {personas.length === 0 && <p className="text-sm text-muted-foreground">No personas created yet.</p>}
                             {personas.map(p => (
-                                <div key={p.id} className="flex justify-between items-center p-2 border rounded-md">
-                                    <span className="font-medium">{p.name}</span>
+                                <div key={p.id} className="flex justify-between items-center p-2 border rounded-md bg-background/50">
+                                    <span className="font-medium text-sm">{p.name}</span>
                                     <div className="flex gap-1">
                                         <Button size="sm" variant="ghost" onClick={() => handleEditPersona(p)}>Edit</Button>
                                         <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeletePersona(p.id)}>Delete</Button>
@@ -441,7 +446,7 @@ Anna: Hi there, how are you?"
                 </Dialog>
 
               {characters.map((char) => (
-                <div key={char.id} className="space-y-3 p-3 border rounded-md relative">
+                <div key={char.id} className="space-y-3 p-4 border rounded-md relative bg-background/30">
                    <Button
                     variant="ghost"
                     size="icon"
@@ -460,6 +465,7 @@ Anna: Hi there, how are you?"
                       onChange={(e) => handleCharacterChange(char.id, 'name', e.target.value)}
                       placeholder="e.g., Narrator"
                       disabled={disabled}
+                       className="bg-background/50 focus:bg-background"
                     />
                   </div>
                    <div className="space-y-1">
@@ -469,10 +475,11 @@ Anna: Hi there, how are you?"
                         onValueChange={(value) => handleCharacterChange(char.id, 'personaId', value)}
                         disabled={disabled}
                     >
-                        <SelectTrigger id={`persona-${char.id}`}>
+                        <SelectTrigger id={`persona-${char.id}`} className="bg-background/50 focus:bg-background">
                             <SelectValue placeholder="Select a persona" />
                         </SelectTrigger>
                         <SelectContent>
+                            {personas.length === 0 && <p className="p-4 text-sm text-muted-foreground">No personas created. Please add one in "Manage Personas".</p>}
                              {personas.map((persona) => (
                               <SelectItem key={persona.id} value={persona.id}>
                                 {persona.name}
@@ -489,7 +496,7 @@ Anna: Hi there, how are you?"
                         onValueChange={(value) => handleCharacterChange(char.id, 'voice', value)}
                         disabled={disabled}
                         >
-                        <SelectTrigger id={`voice-${char.id}`}>
+                        <SelectTrigger id={`voice-${char.id}`} className="bg-background/50 focus:bg-background">
                             <SelectValue placeholder="Select a voice" />
                         </SelectTrigger>
                         <SelectContent>
@@ -517,7 +524,7 @@ Anna: Hi there, how are you?"
                 Add Character
               </Button>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4 pt-6">
+            <CardFooter className="flex flex-col gap-4 pt-6 mt-auto">
               <Button onClick={handleGenerateSkit} disabled={disabled || characters.length === 0} className="w-full text-lg py-6">
                 {isLoading ? (
                   <>
